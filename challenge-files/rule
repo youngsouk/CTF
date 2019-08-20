@@ -1,0 +1,15 @@
+import "secret"
+
+rule NoUnsafeKeys
+{
+    condition:
+       secret.containers[0].units[0].unitKey == "1234"
+}
+
+rule TooManyUnits
+{
+    condition:
+       secret.numUnits > 0x1000
+}
+
+

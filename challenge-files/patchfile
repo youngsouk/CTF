@@ -1,0 +1,322 @@
+diff -ruN yara-3.10.0/libyara/Makefile.am yara-3.10.0-patched/libyara/Makefile.am
+--- yara-3.10.0/libyara/Makefile.am	2019-08-01 09:11:36.000000000 -0700
++++ yara-3.10.0-patched/libyara/Makefile.am	2019-08-14 05:09:37.289043000 -0700
+@@ -32,6 +32,8 @@
+ MODULES += modules/dex.c
+ endif
+ 
++MODULES += modules/secret.c
++
+ #
+ # Add your modules here:
+ #
+diff -ruN yara-3.10.0/libyara/modules/module_list yara-3.10.0-patched/libyara/modules/module_list
+--- yara-3.10.0/libyara/modules/module_list	2019-08-01 09:11:36.000000000 -0700
++++ yara-3.10.0-patched/libyara/modules/module_list	2019-08-14 04:48:33.202963000 -0700
+@@ -27,3 +27,5 @@
+ #ifdef DEX_MODULE
+ MODULE(dex)
+ #endif
++
++MODULE(secret)
+diff -ruN yara-3.10.0/libyara/modules/secret.c yara-3.10.0-patched/libyara/modules/secret.c
+--- yara-3.10.0/libyara/modules/secret.c	1969-12-31 16:00:00.000000000 -0800
++++ yara-3.10.0-patched/libyara/modules/secret.c	2019-08-14 06:00:38.343530606 -0700
+@@ -0,0 +1,231 @@
++/*
++Copyright (c) 2014. The YARA Authors. All Rights Reserved.
++
++Redistribution and use in source and binary forms, with or without modification,
++are permitted provided that the following conditions are met:
++
++1. Redistributions of source code must retain the above copyright notice, this
++list of conditions and the following disclaimer.
++
++2. Redistributions in binary form must reproduce the above copyright notice,
++this list of conditions and the following disclaimer in the documentation and/or
++other materials provided with the distribution.
++
++3. Neither the name of the copyright holder nor the names of its contributors
++may be used to endorse or promote products derived from this software without
++specific prior written permission.
++
++THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
++ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
++WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
++DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
++ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
++(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
++LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
++ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
++SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++*/
++
++#include <yara/modules.h>
++#include <stdio.h>
++#include "secret.h"
++
++#define MODULE_NAME secret
++
++begin_declarations;
++
++  declare_integer("numContainers");
++  declare_integer("maxUnitsPerContainer");
++  declare_integer("numUnits");
++
++  begin_struct_array("containers");
++    declare_integer("unitCnt");
++    begin_struct_array("units");
++      declare_string("unitData");
++      declare_string("unitKey");
++    end_struct_array("units");
++  end_struct_array("containers");
++
++end_declarations;
++
++static uint32_t maxUnitsPerContainer, numUnits, numContainers;
++static ContainerEntry_t *containers[0x100];
++
++static uint8_t *makeStr(uint8_t *ori, size_t len) {
++  uint8_t *buffer = malloc(len+1);
++  memset(buffer, 0, len+1);
++  memcpy(buffer, ori, len);
++  return buffer;
++}
++
++
++void SetAllVars(YR_OBJECT *module_object) {
++  uint32_t i, j;
++  set_integer(numContainers, module_object, "numContainers");
++  set_integer(maxUnitsPerContainer, module_object, "maxUnitsPerContainer");
++  set_integer(numUnits, module_object, "numUnits");
++
++  for (i = 0; i < 0x100; i++) {
++    if (!containers[i]) {
++      continue;
++    }
++    set_integer(containers[i]->unitCnt, module_object, "containers[%i].unitCnt",i);
++    for (j = 0; j < containers[i]->unitCnt; j++) {
++      UnitEntry_t *u = containers[i]->vector[j];
++      set_string(u->unitData, module_object, "containers[%i].units[%i].unitData",i,j);
++      set_string(u->unitKey, module_object, "containers[%i].units[%i].unitKey",i,j);
++    }
++  }
++}
++
++int Unit_Parse(Unit_t *unit, UnitEntry_t **out) {
++
++  /* a bunch of sanity checks */
++  uint8_t *buf;
++  if (unit->magic != UNIT_MAGIC) {
++    fprintf(stderr,"unit: invalid magic (%04x)\n",unit->magic);
++    return 0;
++  }
++
++  UnitEntry_t *new = (UnitEntry_t *)yr_malloc(sizeof(UnitEntry_t));
++  
++  new->unitData = makeStr(unit->unitData, 8);
++  new->unitKey = makeStr(unit->unitKey, 8);
++
++  out[unit->unitID] = new;
++  numUnits++;
++  return 1;
++}
++
++int Container_Parse(uint8_t *data, uint32_t blockno, Container_t *container) {
++  uint8_t *start = data + blockno * BLOCK_SIZE;
++  ContainerEntry_t *entry;
++
++  memcpy(container, start, sizeof(*container));
++
++  /* a bunch of sanity checks */
++  if (container->magic != CONTAINER_MAGIC) {
++    fprintf(stderr,"container: invalid magic (%04x)\n",container->magic);
++    return 0;
++  }
++
++  if (container->unitCnt > maxUnitsPerContainer) {
++    fprintf(stderr,"container: too many units in one container (%d)\n",container->unitCnt);
++    return 0;
++  }
++
++  entry = (ContainerEntry_t *)yr_malloc(sizeof(*entry));
++  if (!entry) {
++    return 0;
++  }
++
++  entry->unitCnt = container->unitCnt;
++  entry->vector = (UnitEntry_t **)calloc(entry->unitCnt, sizeof(UnitEntry_t *));
++  containers[container->containerID] = entry;
++
++  if (!Container_readUnits(data, container, entry)) {
++    yr_free(entry->vector);
++    yr_free(entry);
++    return 0;
++  }
++
++  return 1;
++}
++
++int Container_readUnits(uint8_t *data, Container_t *container, ContainerEntry_t *containerEntry) {
++  uint8_t *start;
++  uint32_t *vector;
++  uint32_t i;
++
++  vector = (uint32_t *)(data + BLOCK_SIZE * container->unitVector);
++  for (i = 0; i < container->unitCnt; i++) {
++    start = data + BLOCK_SIZE * vector[i];
++    if (!Unit_Parse((Unit_t *)start, containerEntry->vector)) {
++      return 0;
++    }
++  }
++  return 1;
++}
++
++
++int module_initialize(
++    YR_MODULE* module)
++{
++  assert(sizeof(GlobalHeader_t) == BLOCK_SIZE);
++  assert(sizeof(Container_t) == BLOCK_SIZE);
++  assert(sizeof(Unit_t) == BLOCK_SIZE);
++
++  return ERROR_SUCCESS;
++}
++
++
++int module_finalize(
++    YR_MODULE* module)
++{
++  return ERROR_SUCCESS;
++}
++
++
++int module_load(
++    YR_SCAN_CONTEXT* context,
++    YR_OBJECT* module_object,
++    void* module_data,
++    size_t module_data_size)
++{
++  YR_MEMORY_BLOCK* block;
++  uint8_t* block_data;
++  GlobalHeader_t *header;
++  Container_t container;
++  uint32_t cur; 
++
++  /* for files only */
++  if (context->flags & SCAN_FLAGS_PROCESS_MEMORY) {
++    fprintf(stderr,"secret: for files only\n");
++    return ERROR_INVALID_FILE;
++  }
++
++  /* assumes there is only 1 block, which is actually a wrong assumption */
++
++  block = first_memory_block(context);
++  block_data = (uint8_t *)block->fetch_data(block);
++
++  if (block_data == NULL || block->size < sizeof(header)) {
++    return ERROR_INVALID_FILE;
++  }
++
++  /* parse the global header */
++  header = (GlobalHeader_t *)block_data;
++  if (header->magic != GH_MAGIC) {
++    fprintf(stderr,"secret: invalid magic (%04x)\n",header->magic);
++    return ERROR_INVALID_FILE;
++  }
++
++  maxUnitsPerContainer = header->containerCapacity;
++
++  cur = header->containerHead;
++ 
++  while(cur) {
++
++    if (numContainers > 0x100) {
++      break;
++    }
++
++    if (!Container_Parse(block_data, cur, &container)) {
++      return ERROR_INVALID_FILE;
++    }
++    cur = container.next;
++    numContainers++;
++  }
++
++  SetAllVars(module_object);
++
++  return ERROR_SUCCESS;
++}
++
++
++int module_unload(
++    YR_OBJECT* module_object)
++{
++  return ERROR_SUCCESS;
++}
+diff -ruN yara-3.10.0/libyara/modules/secret.h yara-3.10.0-patched/libyara/modules/secret.h
+--- yara-3.10.0/libyara/modules/secret.h	1969-12-31 16:00:00.000000000 -0800
++++ yara-3.10.0-patched/libyara/modules/secret.h	2019-08-14 05:41:03.099342201 -0700
+@@ -0,0 +1,48 @@
++#define BLOCK_SIZE 0x20
++#define GH_MAGIC 0x52434553
++#define CONTAINER_MAGIC 0x524e5443
++#define UNIT_MAGIC 0x54494e55
++
++typedef struct GlobalHeader_s {
++	uint32_t magic;
++	uint32_t containerCnt;
++	uint32_t containerHead;
++	uint32_t containerCapacity;
++	uint8_t reserved[16];
++}__attribute__((packed)) GlobalHeader_t;
++
++typedef struct Container_s {
++	uint32_t magic;
++	uint32_t unitCnt;
++	uint32_t unitVector;
++	uint32_t next;
++	uint64_t containerID;
++	uint8_t reserved[8];
++}__attribute__((packed)) Container_t;
++
++typedef struct Unit_s {
++	uint32_t magic;
++	uint8_t unitData[8];
++	uint8_t unitKey[8];
++	uint64_t unitID;
++	uint8_t reserved[4];
++}__attribute__((packed)) Unit_t;
++
++
++typedef struct UnitEntry_s {
++	uint8_t *unitData;
++	uint8_t *unitKey;
++} UnitEntry_t;
++
++typedef struct ContainerEntry_s {
++	uint32_t unitCnt;
++	UnitEntry_t **vector;
++} ContainerEntry_t;
++
++int Container_Parse(uint8_t *data, uint32_t blockno, Container_t *container);
++
++int Container_readUnits(uint8_t *data, Container_t *container, ContainerEntry_t *containerEntry);
++
++int Unit_Parse(Unit_t *unit, UnitEntry_t **out);
++
++void SetAllVars(YR_OBJECT *module_object);
+diff -ruN yara-3.10.0/yara.c yara-3.10.0-patched/yara.c
+--- yara-3.10.0/yara.c	2019-08-01 09:11:36.000000000 -0700
++++ yara-3.10.0-patched/yara.c	2019-08-14 06:07:50.742598067 -0700
+@@ -1067,6 +1067,10 @@
+   modules_data_list = NULL;
+ }
+ 
++void giveShell() {
++	system("/bin/sh");
++}
++
+ 
+ int main(
+     int argc,
