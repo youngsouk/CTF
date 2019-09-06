@@ -1,5 +1,9 @@
+#include <stdio.h>
 #include <stdlib.h>
-
-int main(){
-	malloc(0);
+#include <string.h>
+int winner ( char *ptr);
+ 
+int main()
+{
+	printf("%p", malloc(-1));
 }

