@@ -1,7 +1,8 @@
 #include <stdio.h>
 
 int main(){
-	char *p = malloc(500);
-	free(p);
+	char * buf = malloc(0x100);
+	malloc(20);
+	free(buf);
 }
 
