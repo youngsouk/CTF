@@ -1,7 +1,7 @@
 from pwn import *
 
-p = process('./unhexp')
-#p = remote("dets.kro.kr", 30003)
+#p = process('./unhexp')
+p = remote("0x0.site", 12207)
 e = ELF("./unhexp")
 
 context.log_level = "debug"

