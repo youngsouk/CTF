@@ -2,6 +2,7 @@ from pwn import *
 import sys
 import re
 import pdb
+import signal
 
 def init():
 	global f_name
@@ -196,7 +197,12 @@ def find_p_rdi_r():
 
 	return buffer
 
+def signal_handler(sig, frame):
+	print 'SIGINT is detected!'
+	exit()
+
 if __name__ == '__main__':
+	signal.signal(signal.SIGINT, signal_handler)
 	r = re.compile(r'[0-9]+.+\n') # function content line
 	r2 = re.compile(r'[^a-zA-Z\s]+') # function name
 	r3 = re.compile(r'[0-9]+') # function idx
@@ -218,9 +224,8 @@ if __name__ == '__main__':
 			content += menu_build()
 	###############
 	content += setup()
-	### useful plt and got
+
 	content += useful_plt_got()
-	####################
 	#useful gadget : pop rdi ; ret;
 	content += find_p_rdi_r()
 	####################
