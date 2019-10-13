@@ -3,6 +3,7 @@ import sys
 import re
 import pdb
 import signal
+from colored import fg, attr
 
 def init():
 	global f_name
@@ -27,20 +28,24 @@ def send_before_menu(p, before_menu):
 def print_menu_content(menu_content):
 	length = len(menu_content[len(menu_content)/2]) + 7
 
-	print '\x1b[1;35m' + 'This is menu_content'.center(length, '-') + '\x1b[1;m'
+	print fg(213) + attr('bold') + 'This is menu_content'.center(length, '-') + attr('reset')
 	for i in range(len(menu_content)):
-		print '\x1b[1;31m{0:<2}\x1b[1;m'.format(i) + ' --> ' + menu_content[i]
+		first = '{0}{1}{2:<2} --> {3}'.format(fg(1), attr('bold'), i, attr('reset'))
+		content = '{0}{1}{2}'.format(fg(255) + attr('bold'), menu_content[i], attr('reset'))
+		print  first + content
 
 def rename_menu_content(menu_content):
 	print_menu_content(menu_content)
-	print '\x1b[1;31mmenu_content is very important for this program. So make sure it is correct\x1b[1;m'
-	accept = raw_input('Do you want to change menu_content? \x1b[1;32m(y/Y)\x1b[1;m ').strip()
+	print 'menu_content is very important for this program. So make sure ' + fg(1) + attr('bold')+ 'it is correct' + attr('reset')
+	accept = raw_input('Do you want to change menu_content? ' + fg(155) + attr('bold') + '(y/Y)' + attr('reset')).strip()
 	if accept == 'y' or accept == 'Y':
 		while True:
 			print_menu_content(menu_content)
 
-			print 'which line do you want to delete? (\x1b[1;31mone number\x1b[1;m) \x1b[1;35mex) 5\x1b[1;m'
-			print '\x1b[1;31m-1 is exit\x1b[1;m'
+			buf = '(%s%sone number%s) ' % (fg(1), attr('bold'),  attr('reset'))
+			buf += '%s%sex) 5%s' % (fg('orchid'), attr('bold'), attr('reset'))
+			print 'which line do you want to delete? ' + buf
+			print '%s%s-1 is complete%s' % (fg(1), attr('bold'), attr('reset'))
 			line_idx = int(raw_input())
 			if line_idx == -1:
 				menu_content = '\n'.join(menu_content)
@@ -65,8 +70,18 @@ def extract_function_name(menu_content):
 def find_key(menu_content):
 	return menu_content.split('\n')[-1]
 
-def make_func(p, menu_content, key, function_names):
+def def_func(key, params, function_info, params_conditions):
+	tmp = 'def ' + function_info[1] + '(' + ', '.join(params) + '):\n'	
+	tmp += "	p.recvuntil('" + key + "')\n"
+	tmp += "	p.sendline('" + function_info[0] + "')\n\n"
+	for param_condition in params_conditions:
+		tmp += "	p.sendlineafter('" + param_condition[0] + "', " + param_condition[1] + ")\n"
+	tmp += '\n'
+	return tmp
+
+def make_func(p, menu_content, key, function_names, before_menu):
 	global r2
+	
 
 	p.recvuntil(key)
 	menu = ''
@@ -75,54 +90,44 @@ def make_func(p, menu_content, key, function_names):
 		### find function params and conditions
 		params = []
 		params_conditions = []
-		log.info('processing ' + function_info[1] + ' function')
+		log.info('processing ' + fg(1) + attr('bold') + function_info[1] + attr('reset') + ' function')
 		p.sendline(function_info[0])
 
 		if(function_names[0] == function_info):
 			p.recv(1)
+
 		try:
 			while True:
-				tmp = p.recv(timeout = 0.3)
+				#pdb.set_trace()
+				tmp = p.recv(timeout = 0.3).strip()
+				if p.poll() == 0:
+					raise EOFError
 				if menu_content in tmp:
 					break
 
-				param = r2.sub('',tmp.strip()).strip().split(' ')[-1]
+				param = r2.sub('',tmp).strip().split(' ')[-1]
 				params.append(param)
 				params_conditions.append([tmp,param])
 
-				content = 'plz input test param for ' + "\"\x1b[1;31m" + tmp + "\x1b[1;m\""
+				content = "plz input test param for \"" + fg(1) + attr('bold') + tmp + attr('reset') + "\""
 				print content
-				test = raw_input('\x1b[1;36mparam : \x1b[1;m')
+				test = raw_input(fg(51) + attr('bold') + 'param : \x1b[1;m' + attr('reset'))
 				p.sendline(str(test))
 				print ''
-		except EOFError:
-			print 'Process is terminated'
-			print 'It will be restarted'
+
+		except EOFError, exception:
+			print fg(1) + attr('bold') + 'Process is terminated' + attr('reset')
+			print fg(155) + attr('bold') + 'It will be restarted' + attr('reset')
+			p.close()
 			p = process('./' + f_name)
-			### send str before menu
-			for tmp in before_menu:
-				try:
-					p.recv(timeout = 0.3)
-					p.sendline(str(tmp))
-				except:
-					break
+
+			send_before_menu(p, before_menu)
 			p.recvuntil(key)
 			p.recv(1)
+			menu += def_func(key, params[:-1], function_info, params_conditions[:-1])
 			continue
-			########################
-		except:
-			print 'exception occured...'
-			print 'I guess you typed wrong argument'
-			print 'switch to next function...'
-			continue
-		###########################
-		#print params_conditions
-		tmp = 'def ' + function_info[1] + '(' + ', '.join(params) + '):\n'	
-		tmp += "	p.recvuntil('" + key + "')\n"
-		tmp += "	p.sendline('" + function_info[0] + "')\n\n"
-		for param_condition in params_conditions:
-			tmp += "	p.sendlineafter('" + param_condition[0] + "', " + param_condition[1] + ")\n"
-		menu += tmp
+
+		menu += def_func(key, params, function_info, params_conditions)
 	p.close()
 	return menu
 
@@ -142,13 +147,15 @@ def menu_build():
 	function_names = extract_function_name(menu_content)
 
 	key = find_key(menu_content)
-	print "key string is : \"" + key + "\" "
+	print "key string is : \"" + fg(155) + attr('bold') + key + "\" " + attr('reset')
+	print ''
 	p.close()
 
 	### make menu funciton
 	p = process('./' + f_name)
+	print ''
 	send_before_menu(p, before_menu)
-	menu = make_func(p, menu_content, key, function_names)
+	menu = make_func(p, menu_content, key, function_names, before_menu)
 	return menu
 
 def setup():
@@ -199,7 +206,7 @@ def find_p_rdi_r():
 
 def signal_handler(sig, frame):
 	print 'SIGINT is detected!'
-	exit()
+	raise SystemExit
 
 if __name__ == '__main__':
 	signal.signal(signal.SIGINT, signal_handler)
