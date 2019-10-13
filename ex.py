@@ -204,12 +204,7 @@ def find_p_rdi_r():
 
 	return buffer
 
-def signal_handler(sig, frame):
-	print 'SIGINT is detected!'
-	raise SystemExit
-
 if __name__ == '__main__':
-	signal.signal(signal.SIGINT, signal_handler)
 	r = re.compile(r'[0-9]+.+\n') # function content line
 	r2 = re.compile(r'[^a-zA-Z\s]+') # function name
 	r3 = re.compile(r'[0-9]+') # function idx
