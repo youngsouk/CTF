@@ -19,7 +19,7 @@ def send_before_menu(p, before_menu):
 	for tmp in before_menu:
 		menu_content = ''
 		try:
-			menu_content += p.recv(timeout = 0.3)
+			menu_content += p.recv(timeout = 5)
 			p.sendline(str(tmp))
 		except:
 			break
@@ -43,7 +43,7 @@ def rename_menu_content(menu_content):
 			print_menu_content(menu_content)
 
 			buf = '(%s%sone number%s) ' % (fg(1), attr('bold'),  attr('reset'))
-			buf += '%s%sex) 5%s' % (fg('orchid'), attr('bold'), attr('reset'))
+			buf += '{0}{1}ex) 5{2}'.format(fg('orchid'), attr('bold'), attr('reset'))
 			print 'which line do you want to delete? ' + buf
 			print '%s%s-1 is complete%s' % (fg(1), attr('bold'), attr('reset'))
 			line_idx = int(raw_input())
@@ -82,8 +82,9 @@ def def_func(key, params, function_info, params_conditions):
 def make_func(p, menu_content, key, function_names, before_menu):
 	global r2
 	
+	#pdb.set_trace()
 
-	p.recvuntil(key)
+	p.recvuntil(key, timeout = 5)
 	menu = ''
 
 	for function_info in function_names:
@@ -98,11 +99,15 @@ def make_func(p, menu_content, key, function_names, before_menu):
 
 		try:
 			while True:
-				#pdb.set_trace()
-				tmp = p.recv(timeout = 0.3).strip()
+				tmp = p.recv(timeout = 5).strip()
 				if p.poll() == 0:
 					raise EOFError
 				if menu_content in tmp:
+					tmp = tmp.strip().replace(menu_content, '').strip()
+
+					#param = r2.sub('',tmp).strip().split(' ')[-1]
+					#params.append(param)
+					#params_conditions.append([tmp,param])
 					break
 
 				param = r2.sub('',tmp).strip().split(' ')[-1]
@@ -122,7 +127,7 @@ def make_func(p, menu_content, key, function_names, before_menu):
 			p = process('./' + f_name)
 
 			send_before_menu(p, before_menu)
-			p.recvuntil(key)
+			p.recvuntil(key, timeout = 5)
 			p.recv(1)
 			menu += def_func(key, params[:-1], function_info, params_conditions[:-1])
 			continue
@@ -134,14 +139,14 @@ def make_func(p, menu_content, key, function_names, before_menu):
 def menu_build():
 	global f_name
 
-	if(len(sys.argv) >= 4):
+	if(len(sys.argv) >= 3):
 		before_menu = sys.argv[3:]
 
 	p = process('./' + f_name)
 	#context.log_level = "debug"
 	
 	send_before_menu(p, before_menu)
-	menu_content = p.recv().strip()
+	menu_content = p.recv(timeout = 3).strip()
 	menu_content = rename_menu_content(menu_content.split('\n'))
 
 	function_names = extract_function_name(menu_content)
