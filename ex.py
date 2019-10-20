@@ -81,8 +81,6 @@ def def_func(key, params, function_info, params_conditions):
 
 def make_func(p, menu_content, key, function_names, before_menu):
 	global r2
-	
-	#pdb.set_trace()
 
 	p.recvuntil(key, timeout = 5)
 	menu = ''
@@ -100,10 +98,10 @@ def make_func(p, menu_content, key, function_names, before_menu):
 		try:
 			while True:
 				tmp = p.recv(timeout = 5).strip()
-				if p.poll() == 0:
-					raise EOFError
 				if menu_content in tmp:
 					tmp = tmp.strip().replace(menu_content, '').strip()
+
+					#pdb.set_trace()
 
 					#param = r2.sub('',tmp).strip().split(' ')[-1]
 					#params.append(param)
@@ -119,6 +117,8 @@ def make_func(p, menu_content, key, function_names, before_menu):
 				test = raw_input(fg(51) + attr('bold') + 'param : \x1b[1;m' + attr('reset'))
 				p.sendline(str(test))
 				print ''
+				if p.poll() == 0:
+					raise EOFError
 
 		except EOFError, exception:
 			print fg(1) + attr('bold') + 'Process is terminated' + attr('reset')

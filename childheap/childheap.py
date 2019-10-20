@@ -2,13 +2,12 @@ from pwn import *
 
 context.log_level = 'debug'
 
-def malloc(index, size, content):
+def malloc(index, size):
 	p.recvuntil('>')
 	p.sendline('1')
 
 	p.sendlineafter('index:', index)
 	p.sendlineafter('size:', size)
-	p.sendlineafter('content:', content)
 
 def free(index):
 	p.recvuntil('>')

@@ -28,10 +28,11 @@ def Rename_Zoo(name):
 
 	p.sendlineafter('New name :', name)
 
-def Leave_Zoo():
+def Leave_Zoo(sure):
 	p.recvuntil('---->')
 	p.sendline('5')
 
+	p.sendlineafter('Are you sure :', sure)
 
 p = process('./dyn_zoo')
 #p = remote('',)
