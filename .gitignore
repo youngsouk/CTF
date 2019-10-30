@@ -1,0 +1,7 @@
+#folder
+libc-database/
+pwndbg
+LibcSearcher/
+
+#file
+ex.py

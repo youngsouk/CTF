@@ -63,7 +63,7 @@ def extract_function_name(menu_content):
 	for tmp in tmps:
 		idx = r3.search(tmp).group()
 		tmp = r2.sub('', tmp)
-		function_name = tmp.strip().replace(' ', '_')
+		function_name = tmp.strip().lower().split(' ')[0]
 		function_names.append([str(idx), function_name])
 	return function_names
 
@@ -72,10 +72,9 @@ def find_key(menu_content):
 
 def def_func(key, params, function_info, params_conditions):
 	tmp = 'def ' + function_info[1] + '(' + ', '.join(params) + '):\n'	
-	tmp += "	p.recvuntil('" + key + "')\n"
-	tmp += "	p.sendline('" + function_info[0] + "')\n\n"
+	tmp += "	p.sendafter('" + key + "', '" + function_info[0] + "')\n\n"
 	for param_condition in params_conditions:
-		tmp += "	p.sendlineafter('" + param_condition[0] + "', " + param_condition[1] + ")\n"
+		tmp += "	p.sendafter('" + param_condition[0] + "', str(" + param_condition[1] + "))\n"
 	tmp += '\n'
 	return tmp
 
@@ -172,7 +171,6 @@ def setup():
 	buffer += "e = ELF('./" + str(f_name) + "')\n"
 	buffer += "l = e.libc\n"
 	buffer += "#l = ELF('./')\n\n"
-	buffer += '\n'
 
 	return buffer
 
@@ -232,11 +230,11 @@ if __name__ == '__main__':
 	###############
 	content += setup()
 
-	content += useful_plt_got()
+	#content += useful_plt_got()
 	#useful gadget : pop rdi ; ret;
-	content += find_p_rdi_r()
+	#content += find_p_rdi_r()
 	####################
-	content += "pause()\n\n"
+	content += "pause()\n\n\n\n"
 	content += "p.interactive()"
 
 	f.write(content)
