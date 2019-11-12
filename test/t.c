@@ -3,5 +3,8 @@
 #include <string.h>
 int main()
 {
-	printf("%p", malloc(-1));
+	void * p = malloc(200);
+	malloc(10);
+	free(p);
+	malloc(10);
 }
